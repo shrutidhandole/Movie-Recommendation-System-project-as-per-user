@@ -1,0 +1,424 @@
+<font color='gray' size=6><b>MOVIE RECOMMENDER SYSTEM</b></font>
+
+# Importing Libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tabulate import tabulate
+import re
+
+from sklearn.metrics.pairwise import cosine_similarity
+import ipywidgets as widgets
+from IPython.display import display
+
+<font color='blue' size=5><b>Popularity-based recommender system at a genre level</b></font>
+
+### Objective:
+1. Create a popularity-based recommender system at a genre level. The user will input a
+    genre (g), minimum rating threshold (t) for a movie, and no. of
+    recommendations(N) for which it should be recommended top N movies which are
+    most popular within that genre (g) ordered by ratings in descending order where each
+    movie has at least (t) reviews.
+
+# Load the dataset
+movies = pd.read_csv("movies.csv")
+ratings = pd.read_csv("ratings.csv")
+
+# Display the dataset (5 rows)
+movies.head()
+
+ratings.head()
+
+## ● Exploratory Data Analysis including:
+    o Understanding of distribution of the features available
+    o Finding unique users and movies
+    o Average rating and Total movies at genre level.
+    o Unique genres considered..
+
+# Display all information about the features and Important data
+print("@.... Information About the Movies Data :- ")
+print("======================================================================================")
+print("\nTotal Rows : ",movies.shape[0])
+print("Total Columns : ",movies.shape[1])
+print("\n********************************************")
+print(movies.info())
+print("\n********************************************")
+print(movies.columns)
+
+# Display all information about the features and Important data
+print("\n\n\n@.... Information About the ratings Data :- ")
+print("======================================================================================")
+print("\nTotal Rows : ",ratings.shape[0])
+print("Total Columns : ",ratings.shape[1])
+print("\n********************************************")
+print(ratings.info())
+print("\n********************************************")
+print(ratings.columns)
+
+# Missing data analysis
+print("Null Values Analysis(ratings Data) ;\n")
+print(ratings.isnull().sum())
+print("\nDuplicates : ",ratings.duplicated().sum())
+print("\nDescribe Funtion :\n")
+ratings.describe()
+
+#### From above the Average Rating is 3.5 and minimum and maximum rating is 3.5 & 5. The total users which provided rating as 668 for 149532 movies
+
+# Missing data analysis
+print("Null Values Analysis(movies Data) ;\n")
+print(movies.isnull().sum())
+print("\nDuplicates : ",movies.duplicated().sum())
+print("\nDescribe Funtion :\n")
+movies.describe()
+
+# Merge the dataset for combined analysis
+movies_ratings = pd.merge(movies, ratings, on="movieId")
+movies_ratings.head()
+
+# Finding unique users and movies
+Unique_user = movies_ratings["userId"].nunique()
+Unique_movies = movies_ratings["movieId"].nunique()
+
+print(f"Unique Users : {Unique_user}")
+print(f"Unique Movies : {Unique_movies}")
+
+# For example
+Genre = "Comedy"
+min_reviews = 100
+top_recommdation = 10
+
+# Split genres
+movies_ratings["genres"] = movies_ratings["genres"].str.split('|')   # Converting each genre string into a list of genres.
+movies_ratings = movies_ratings.explode("genres")  # It will now appear in multiple rows, one for each genre.
+filter_movies_genres = movies_ratings[movies_ratings["genres"] == Genre]
+
+#  Average rating and Total movies at genre level.
+Average_rating_genre = movies_ratings.groupby("genres")["rating"].mean()
+Total_movies_genre = movies_ratings.groupby("genres")["movieId"].nunique()
+
+rating_movie_genre = pd.DataFrame({"Avg_rating":round(Average_rating_genre,1),"Total_movies":Total_movies_genre})
+rating_movie_genre[1:]
+
+#Unique genres considered..
+Unique_genres = movies_ratings["genres"].unique()
+print(f"Unique Genres : {Unique_genres}")
+
+most_rated=movies_ratings['title'].value_counts().head(10)
+most_rated
+
+### Data Visualizations
+
+# Most Rated Movies
+
+plt.figure(figsize=(15,5))
+sns.barplot(x=most_rated.index,y=most_rated.values,palette='plasma')
+plt.title("Top 10 Most Rated Movies", fontweight='bold',color='brown',size=25)
+plt.xticks(rotation=45,ha='right')
+plt.xlabel("Movie Titles",fontweight='bold',color='k',size=15)
+plt.ylabel("Number of ratings",fontweight='bold',color='k',size=15)
+plt.grid(axis='y',linestyle="--",color="gray",alpha=0.5)
+plt.show()
+
+# Highest rated movies
+avg_rating = movies_ratings.groupby('title')['rating'].mean()
+rating_count = movies_ratings['title'].value_counts()
+avg_rating_movie = avg_rating[rating_count > 200].sort_values(ascending=False).head(10)
+plt.figure(figsize=(15,5))
+sns.barplot(x=avg_rating_movie.index,y=avg_rating_movie.values,width=0.6,palette="hot",edgecolor='gray')
+plt.ylabel("Movie Title",fontweight='bold',color='k',size=10)
+plt.xlabel("Average Rating",fontweight='bold',color='k',size=10)
+plt.xticks(rotation=45,ha='right')
+plt.yticks(np.arange(0.0,5.1,0.5))
+plt.title("Top 10 Highest Rated Movies", fontweight='bold',color='brown',size=25)
+plt.grid(True,axis="y",linestyle="--",alpha=0.3)
+plt.show()
+
+movies_ratings.head()
+
+# Create a dataframe with the average rating and number of reviews for each movie.
+
+Avg_ratings = filter_movies_genres.groupby("movieId").agg(avg_rating=("rating","mean"), top_reviews=("rating","count")).reset_index()
+Avg_ratings = Avg_ratings.merge(movies[['movieId', 'title']], on='movieId')
+
+Avg_ratings.head()
+
+Avg_ratings["avg_rating"] = round((Avg_ratings["avg_rating"]),1)
+
+# Filter by minimum reviews threshold
+filtered_ratings = Avg_ratings[Avg_ratings["top_reviews"]>= min_reviews]
+
+# Sort ratings by avg ratings
+Sort_ratings = filtered_ratings.sort_values(by= "avg_rating", ascending=False)
+
+# Select top 10 movies
+recommdation = Sort_ratings.head(top_recommdation)
+
+recommdation.head()
+
+Recommdation_user = recommdation.reset_index(drop=True)
+
+# Display the recommdation
+print(Recommdation_user[["title","avg_rating","top_reviews"]])
+
+Recommdation_user.head(10)
+
+from tabulate import tabulate
+
+Table = Recommdation_user[["title","avg_rating","top_reviews"]].values.tolist()
+
+for i,row in enumerate(Table):
+    row.insert(0,i+1)
+
+# Define Headers
+headers = ["Sr.No","Movie Title","Average Movie Rating","Num Reviews"]
+
+# Create table to display output
+print(tabulate(Table, headers=headers, tablefmt='pretty'))
+
+# 'plain', 'simple', 'grid', 'pipe', 'orgtbl', 'rst', 'mediawiki',
+#'latex', 'latex_raw', 'latex_booktabs', 'latex_longtable' and tsv.
+
+
+# create function to generate recommdation of Movies of user on basis of the genre(match the genre of users movies with 
+# all movies and extrat top movies by rating)
+
+def output(movies,ratings,Genre,min_reviews,top_recommdation):
+    movies_ratings = pd.merge(movies, ratings, on="movieId")
+    
+    movies_ratings["genres"] = movies_ratings["genres"].str.split('|')   # Converting each genre string into a list of genres.
+    movies_ratings = movies_ratings.explode("genres")  # It will now appear in multiple rows, one for each genre.
+    filter_movies_genres = movies_ratings[movies_ratings["genres"] == Genre]
+    
+    Avg_ratings = filter_movies_genres.groupby("movieId").agg(avg_rating=("rating","mean"), top_reviews=("rating","count")).reset_index()
+    Avg_ratings = Avg_ratings.merge(movies[['movieId', 'title']], on='movieId')
+    Avg_ratings["avg_rating"] = round((Avg_ratings["avg_rating"]),1)
+    
+    # Filter by minimum reviews threshold
+    filtered_ratings = Avg_ratings[Avg_ratings["top_reviews"]>= min_reviews]
+
+    # Sort ratings by avg ratings
+    Sort_ratings = filtered_ratings.sort_values(by= "avg_rating", ascending=False)
+
+    # Select top 10 movies
+    recommdation = Sort_ratings.head(top_recommdation)
+    Recommdation_user = recommdation.reset_index(drop=True)
+    
+    Table = Recommdation_user[["title","avg_rating","top_reviews"]].values.tolist()
+
+    for i,row in enumerate(Table):
+        row.insert(0,i+1)
+
+    # Define Headers
+    headers = ["Sr.No","Movie Title","Average Movie Rating","Num Reviews"]
+
+    # Create table to display output
+    return print(tabulate(Table, headers=headers, tablefmt='pretty'))
+
+# Create a function to take input from user and generate recommendation accordingly(using IPywidgets library)
+def recommdation():
+    print("*Movie Recommendation by Popularity")
+    Genre_wid = widgets.Dropdown(
+        options = sorted(movies["genres"].str.split("|").explode().unique()),
+        description="Genre: ")
+    min_reviews_wid = widgets.IntText(description="Minimum reviews threshold  : ")
+    top_recommendation_wid = widgets.IntText(description="Num recommendations : ")
+    
+    inputs = widgets.VBox([Genre_wid, min_reviews_wid, top_recommendation_wid])
+    display(inputs)
+    
+    # Adjust the layout to ensure the description labels are fully visible
+    Genre_wid.style.description_width = 'initial'
+    min_reviews_wid.style.description_width = 'initial'
+    top_recommendation_wid.style.description_width = 'initial'
+    
+    def on_submit(change):
+        Genre = Genre_wid.value
+        min_reviews = min_reviews_wid.value
+        top_recommdation = top_recommendation_wid.value
+    
+        output(movies,ratings,Genre,min_reviews,top_recommdation)
+        
+    button = widgets.Button(description="Get Recommendation")
+    button.on_click(on_submit)
+    display(button)
+
+recommdation()
+
+recommdation()
+
+recommdation()
+
+recommdation()
+
+<font color='blue' size=5><b>Content-based recommender system</b></font>
+
+### Objective
+2. Create a content-based recommender system that recommends top N movies based on
+    similar movie(m) genres.
+
+# Preprocess
+movie_genre_matrix = movies.copy()
+movie_genre_matrix["genres"] = movie_genre_matrix["genres"].str.split('|')   # Converting each genre string into a list of genres.
+movie_genre_matrix = movie_genre_matrix.explode("genres")
+movie_genre_matrix["value"] = 1
+movie_genres_matrix = movie_genre_matrix.pivot_table(index='movieId', columns='genres', values='value', fill_value=0)
+movie_genres_matrix.head()
+
+
+def content_recommaded(movie_name, top_n=10):
+    # finds the movieId of the first movie
+    movie_id = movies[movies['title'].str.contains(movie_name)].iloc[0]['movieId']
+    # retrieves the vector representation (features/genres) of the movie corresponding to movie_id and reshapes it into a 2D array suitable for further processing
+    movie_vector = movie_genres_matrix.loc[movie_id].values.reshape(1, -1)
+    cosine_sim = cosine_similarity(movie_genres_matrix, movie_vector).flatten()
+    # finds the indices of the top top_n most similar movies to the target movie, sorted by similarity in descending order.
+    similar_movies_indices = cosine_sim.argsort()[-top_n-1:-1][::-1]
+    similar_movies = movies.iloc[similar_movies_indices]
+    return similar_movies[['title']]
+
+#recommended_movies = content_recommaded("Toy Story", top_n=10)
+#print(recommended_movies)
+
+def Top_content_recommdation():
+    print("*Movie Recommendation (Using Content)")
+    movie_title_wid = widgets.Dropdown(options = sorted(movies["title"].unique()),description="Movie title get : ")
+    movie_name_wid = widgets.Text(description="Enter Movie title : ")
+    top_n_wid = widgets.IntText(description="Num Recommdation : ")
+    
+    inputs = widgets.VBox([movie_title_wid,movie_name_wid,top_n_wid])
+    display(inputs)
+    
+    movie_title_wid.style.description_width = 'initial'
+    movie_name_wid.style.description_width = 'initial'
+    top_n_wid.style.description_width = 'initial'
+    
+    def on_submit(change):
+        movie_name = movie_name_wid.value
+        top_n = top_n_wid.value
+        
+        # Generate output title
+        print(f"Top {top_n} Movie Recommendations for {movie_name}:")
+    
+        recommdation = content_recommaded(movie_name, top_n)
+        recommdation.reset_index(drop=True, inplace=True)
+        Table = recommdation[["title"]].values.tolist()
+        for i,row in enumerate(Table):
+            row.insert(0,i+1)
+        # Define Headers
+        headers = ["Sr.No","Movie Title"]
+        print(tabulate(Table, headers=headers, tablefmt='pretty'))
+    button =  widgets.Button(description = "Get Recommendation")
+    button.on_click(on_submit)
+    display(button)
+
+Top_content_recommdation()
+
+Top_content_recommdation()
+
+<font color='blue' size=5><b>Collaborative based recommender system</b></font>
+
+### Objective
+3. Create a collaborative based recommender system which recommends top N movies
+    based on “K” similar users for a target user “u”
+
+user_movie_matrix = ratings.pivot(index="userId", columns="movieId", values="rating").fillna(0)
+user_movie_matrix.head()
+
+user_similarity = cosine_similarity(user_movie_matrix)
+user_similarity_df = pd.DataFrame(user_similarity, index=user_movie_matrix.index, columns=user_movie_matrix.index)
+user_similarity_df.head()
+
+# Find K similar users for target user
+def top_similar_user(user_id,k):
+     # Get similarity scores for the target user
+    similarity_score = user_similarity_df[user_id]
+    # Sort users by similarity score and exclude the target user
+    similar_user = similarity_score.sort_values(ascending=False).index.drop(user_id)
+    # Return the top K similar users
+    return similar_user[:k]
+
+def users_recommended_movies(user_id,k,n):
+    # Find top K similar users
+    similar_users = top_similar_user(user_id,k)
+     # Aggregate ratings of the similar users
+    similar_user_rating = user_movie_matrix.loc[similar_users]
+    # Calculate the mean rating for each movie
+    movie_recommend = similar_user_rating.mean(axis=0)
+    
+    # Filter out movies already seen by the target user
+    seen_movies = user_movie_matrix.loc[user_id].replace(0,pd.NA).dropna().index
+    movie_recommendation = movie_recommend.drop(seen_movies)
+    
+    top_recommend = movie_recommendation.sort_values(ascending=False).head(n)
+    top_recommendation = top_recommend.reset_index().merge(movies[["movieId","title"]], on="movieId")
+    return top_recommendation
+
+def Top_movies_recommdation():
+    user_id = int(input("User Id : "))
+    n = int(input("Num Recommdation : "))
+    k = int(input("Threshold for similar users : "))
+    recommdation = users_recommended_movies(user_id,k,n)
+    #recommdation.reset_index(drop=True)
+    Table = recommdation[["title"]].values.tolist()
+    for i,row in enumerate(Table):
+        row.insert(0,i+1)
+    # Define Headers
+    headers = ["Sr.No","Movie Title"]
+    return print(tabulate(Table, headers=headers, tablefmt='pretty'))
+
+Top_movies_recommdation()
+
+def Top_movies_recommdation():
+    print("*Movie Recommendation (user collaborative)")
+    print("\n\nNote: Enter user id from 1 to 668")
+
+    user_id_wid = widgets.IntText(description="User Id : ")
+    n_wid = widgets.IntText(description= "Num Recommdation : ")
+    k_wid = widgets.IntText(description= "Threshold for similar users : ")
+    
+    inputs = widgets.VBox([user_id_wid,k_wid,n_wid])
+    display(inputs)
+    
+    user_id_wid.style.description_width = 'initial'
+    n_wid.style.description_width = 'initial'
+    k_wid.style.description_width = 'initial'
+    
+    def on_submit(change):
+        user_id = user_id_wid.value
+        n = n_wid.value
+        k =  k_wid.value
+
+        recommdation = users_recommended_movies(user_id,k,n)
+        #recommdation.reset_index(drop=True)
+        Table = recommdation[["title"]].values.tolist()
+        for i,row in enumerate(Table):
+            row.insert(0,i+1)
+        # Define Headers
+        headers = ["Sr.No","Movie Title"]
+        print(tabulate(Table, headers=headers, tablefmt='pretty'))
+    
+     # button
+    button = widgets.Button(description = "Get Recommendation")
+    button.on_click(on_submit)
+    display(button)
+
+Top_movies_recommdation()
+
+Top_movies_recommdation()
+
+## Evaluation
+
+<font color='blue' size=3><b><u> popularity-based recommender system at a genre level</u></b></font>
+
+recommdation()
+
+<font color='blue' size=3><b><u> content-based recommender system</u></b></font>
+
+Top_content_recommdation()
+
+<font color='blue' size=3><b><u>  collaborative based recommender system</u></b></font>
+
+Top_movies_recommdation()
+
+## END
